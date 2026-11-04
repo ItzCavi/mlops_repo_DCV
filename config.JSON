@@ -1,0 +1,36 @@
+{
+  "datos": {
+    "archivo": "Base_de_datos.csv",
+    "objetivo_original": "Pago_atiempo",
+    "objetivo_modelo": "impago"
+  },
+  "particion": {
+    "test_size": 0.2,
+    "random_state": 42
+  },
+  "limpieza": {
+    "edad_maxima_valida": 100,
+    "puntaje_datacredito_minimo_valido": 100,
+    "categorias_tendencia": ["Decreciente", "Estable", "Creciente"],
+    "variables_eliminadas": ["saldo_mora_codeudor", "puntaje", "fecha_prestamo"]
+  },
+  "preprocesamiento": {
+    "percentil_inferior_recorte": 0.01,
+    "percentil_superior_recorte": 0.99,
+    "frecuencia_minima_categoria": 0.01
+  },
+  "entrenamiento": {
+    "cv_folds": 5,
+    "metrica_principal": "average_precision",
+    "pesos_seleccion": {
+      "rendimiento": 0.6,
+      "consistencia": 0.2,
+      "escalabilidad": 0.2
+    }
+  },
+  "salidas": {
+    "modelo": "mejor_modelo.joblib",
+    "tabla_resumen": "resumen_evaluacion.csv",
+    "grafico_comparativo": "comparacion_modelos.png"
+  }
+}
