@@ -16,7 +16,7 @@ Proceso
    - umbral de decisión que maximiza F1 sobre las predicciones fuera de fold.
 3. Evaluación final en el conjunto de evaluación, que no se usó para ninguna decisión.
 4. Selección por un puntaje ponderado de rendimiento, consistencia y escalabilidad (pesos en
-   config.JSON), tabla resumen, gráficos comparativos y guardado del mejor modelo.
+   config.json), tabla resumen, gráficos comparativos y guardado del mejor modelo.
 
 Por qué AUC-PR y no accuracy: solo el 4,7 % de los créditos son impagos; un modelo que siempre
 predice "paga" tiene 95 % de accuracy y no detecta ningún impago. La AUC-PR de un modelo sin
@@ -121,8 +121,8 @@ def validacion_cruzada(modelo: Pipeline, X, y, n_folds: int) -> dict:
 
         inicio = time.perf_counter()
         proba_val = m.predict_proba(X_val)[:, 1]
-        # Tiempo normalizado a 1.000 registros para comparar modelos de forma justa.
-        tiempos_pred.append((time.perf_counter() - inicio) / len(X_val) * 1000)
+        # Milisegundos por cada 1.000 registros: segundos / filas * 1.000 filas * 1.000 ms.
+        tiempos_pred.append((time.perf_counter() - inicio) / len(X_val) * 1000 * 1000)
 
         proba_oof[indices_val] = proba_val
         ap_val.append(average_precision_score(y_val, proba_val))
@@ -346,7 +346,7 @@ def entrenar_y_evaluar():
     columnas = ["cv_ap_media", "cv_ap_desv", "cv_roc_media", "cv_f1", "brecha_train_val",
                 "tiempo_fit_s", "tiempo_pred_ms_1000", "umbral",
                 "test_average_precision", "test_roc_auc", "test_precision", "test_recall",
-                "test_f1", "test_balanced_accuracy", "test_tp", "test_fp", "test_fn", "test_tn",
+                "test_f1", "test_accuracy", "test_balanced_accuracy", "test_tp", "test_fp", "test_fn", "test_tn",
                 "puntaje_rendimiento", "puntaje_consistencia", "puntaje_escalabilidad",
                 "puntaje_total", "seleccionado"]
     tabla = resumen[columnas].copy()
@@ -384,12 +384,20 @@ def entrenar_y_evaluar():
 def imprimir_resumen(tabla, mejor_nombre, importancias, salidas):
     vista = tabla[["cv_ap_media", "cv_ap_desv", "cv_roc_media", "brecha_train_val",
                    "tiempo_fit_s", "umbral", "test_average_precision", "test_roc_auc",
-                   "test_precision", "test_recall", "test_f1", "puntaje_total"]]
+                   "test_precision", "test_recall", "test_f1", "test_accuracy", "puntaje_total"]]
     with pd.option_context("display.width", 200, "display.max_columns", 20,
                            "display.float_format", "{:.3f}".format):
         print("\nTabla resumen de evaluación")
         print(vista.to_string())
     print(f"\nModelo seleccionado: {mejor_nombre}")
+    fila = tabla.loc[mejor_nombre]
+    print("Justificación:")
+    print(f"  - Rendimiento: AUC-PR en validación cruzada de {fila['cv_ap_media']:.3f} "
+          f"(la línea base es {tabla.loc[NOMBRE_BASE, 'cv_ap_media']:.3f}).")
+    print(f"  - Consistencia: desviación entre folds de {fila['cv_ap_desv']:.3f} y brecha "
+          f"entrenamiento-validación de {fila['brecha_train_val']:.3f}.")
+    print(f"  - Escalabilidad: {fila['tiempo_fit_s']:.2f} s de entrenamiento y "
+          f"{fila['tiempo_pred_ms_1000']:.2f} ms por cada 1.000 predicciones.")
     print("Variables más importantes (caída de AUC-PR al permutarlas):")
     print(importancias.sort_values(ascending=False).head(8).round(4).to_string())
     print(f"\nArchivos generados: {salidas['modelo']}, {salidas['tabla_resumen']}, "

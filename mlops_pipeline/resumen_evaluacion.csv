@@ -1,0 +1,6 @@
+﻿modelo,cv_ap_media,cv_ap_desv,cv_roc_media,cv_f1,brecha_train_val,tiempo_fit_s,tiempo_pred_ms_1000,umbral,test_average_precision,test_roc_auc,test_precision,test_recall,test_f1,test_accuracy,test_balanced_accuracy,test_tp,test_fp,test_fn,test_tn,puntaje_rendimiento,puntaje_consistencia,puntaje_escalabilidad,puntaje_total,seleccionado
+Línea base,0.0475,0.0002,0.5000,0.0907,0.0000,0.0503,6.4637,0.0475,0.0474,0.5000,0.0474,1.0000,0.0905,0.0474,0.5000,102,2051,0,0,,,,,False
+Regresión logística,0.1483,0.0180,0.6919,0.1856,0.0117,0.0759,6.8289,0.7700,0.1315,0.6548,0.2029,0.1373,0.1637,0.9336,0.5552,14,55,88,1996,0.9601,1.0000,1.0000,0.9761,True
+Árbol de decisión,0.0883,0.0093,0.6129,0.1446,0.0530,0.0855,6.9062,0.6481,0.0650,0.5558,0.0769,0.1667,0.1053,0.8658,0.5336,17,204,85,1847,0.0000,0.8480,0.9712,0.3639,False
+Random Forest,0.1508,0.0354,0.6912,0.1801,0.2092,0.9226,50.5751,0.5723,0.1314,0.6350,0.1260,0.1569,0.1397,0.9085,0.5514,16,111,86,1940,1.0000,0.0000,0.0000,0.6000,False
+Gradient Boosting,0.1456,0.0309,0.6893,0.1837,0.0949,1.3587,9.0864,0.6553,0.1506,0.6467,0.1382,0.2059,0.1654,0.9015,0.5710,21,131,81,1920,0.9170,0.5529,0.2955,0.7199,False

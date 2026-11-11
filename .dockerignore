@@ -1,0 +1,20 @@
+# Archivos que no deben entrar en el contexto de construcción de la imagen.
+venv/
+.venv/
+.git/
+.github/
+**/__pycache__/
+**/*.pyc
+**/*.ipynb
+**/.ipynb_checkpoints/
+BD_creditos.xlsx
+mlops_pipeline/mejor_modelo.joblib
+mlops_pipeline/comparacion_modelos.png
+mlops_pipeline/resumen_evaluacion.csv
+mlops_pipeline/monitoreo_*.csv
+.coverage
+coverage.xml
+resultados_pruebas.xml
+.pytest_cache/
+.scannerwork/
+jenkins_home/

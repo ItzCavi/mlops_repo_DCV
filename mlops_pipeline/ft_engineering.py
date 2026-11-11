@@ -15,7 +15,7 @@ Separación de responsabilidades:
    así que solo debe ajustarse con el conjunto de entrenamiento. Ese ajuste ocurre dentro del
    pipeline del modelo en model_training_evaluation.py.
 
-Las decisiones de limpieza y transformación vienen de Comprension_eda.ipynb (secciones 3, 8 y 9).
+Las decisiones de limpieza y transformación vienen de comprension_eda.ipynb (secciones 3, 8 y 9).
 
 Variable objetivo: el modelo estima la probabilidad de IMPAGO (impago = 1 - Pago_atiempo), porque
 la clase de interés para el negocio es la minoritaria (4,7 % de los créditos) y las métricas de
@@ -34,9 +34,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, StandardScaler
 
-# Rutas relativas a la carpeta del script, para que funcione desde cualquier directorio de trabajo.
+# Rutas relativas a la ubicación del script, para que funcione desde cualquier directorio de trabajo.
+# RAIZ: carpeta mlops_pipeline/ (código, configuración y artefactos del modelo).
+# RAIZ_REPO: raíz del repositorio, donde está la tabla materializada Base_de_datos.csv.
 RAIZ = Path(__file__).resolve().parent
-RUTA_CONFIG = RAIZ / "config.JSON"
+RAIZ_REPO = RAIZ.parent
+RUTA_CONFIG = RAIZ / "config.json"
 
 
 def cargar_configuracion(ruta: Path = RUTA_CONFIG) -> dict:
@@ -77,6 +80,17 @@ VARIABLES_ORDINALES = ["tendencia_ingresos"]
 
 VARIABLES_MODELO = (VARIABLES_LOG + VARIABLES_NUMERICAS + VARIABLES_BINARIAS
                     + VARIABLES_NOMINALES + VARIABLES_ORDINALES)
+
+# Columnas crudas que se esperan en la entrada (las de Base_de_datos.csv sin la variable
+# objetivo). Las usan model_deploy.py y model_monitoring.py para validar los datos recibidos.
+COLUMNAS_ENTRADA = [
+    "tipo_credito", "fecha_prestamo", "capital_prestado", "plazo_meses", "edad_cliente",
+    "tipo_laboral", "salario_cliente", "total_otros_prestamos", "cuota_pactada", "puntaje",
+    "puntaje_datacredito", "cant_creditosvigentes", "huella_consulta", "saldo_mora",
+    "saldo_total", "saldo_principal", "saldo_mora_codeudor", "creditos_sectorFinanciero",
+    "creditos_sectorCooperativo", "creditos_sectorReal", "promedio_ingresos_datacredito",
+    "tendencia_ingresos",
+]
 
 
 # ---------------------------------------------------------------------------------------------
@@ -141,7 +155,7 @@ def crear_atributos_derivados(df: pd.DataFrame) -> pd.DataFrame:
 def generar_features(df: pd.DataFrame) -> pd.DataFrame:
     """Limpieza + atributos derivados + selección de columnas del modelo.
 
-    Es la función que se reutiliza en producción (deploy.py) sobre registros nuevos, por lo que
+    Es la función que se reutiliza en producción (model_deploy.py) sobre registros nuevos, por lo que
     no debe depender de la variable objetivo.
     """
     df = crear_atributos_derivados(limpiar_datos(df))
@@ -223,8 +237,8 @@ def construir_preprocesador(config: dict = CONFIG) -> ColumnTransformer:
 # ---------------------------------------------------------------------------------------------
 
 def cargar_datos(config: dict = CONFIG) -> pd.DataFrame:
-    """Lee la tabla materializada por Cargar_datos.ipynb."""
-    ruta = RAIZ / config["datos"]["archivo"]
+    """Lee la tabla materializada por Cargar_datos.ipynb (en la raíz del repositorio)."""
+    ruta = RAIZ_REPO / config["datos"]["archivo"]
     if not ruta.exists():
         raise FileNotFoundError(f"No existe {ruta}. Ejecute primero Cargar_datos.ipynb.")
     return pd.read_csv(ruta)

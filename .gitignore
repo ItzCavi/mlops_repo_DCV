@@ -1,0 +1,21 @@
+# Entorno virtual y cachés de Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Resultados de pruebas y análisis (se regeneran en Jenkins / GitHub Actions)
+.pytest_cache/
+.coverage
+coverage.xml
+resultados_pruebas.xml
+.scannerwork/
+
+# Salidas del trabajo de monitoreo (se regeneran con: python mlops_pipeline/model_monitoring.py --job)
+mlops_pipeline/monitoreo_*.csv
+
+# Archivos locales que no hacen parte del proyecto
+Claude outputs/
+jenkins_home/
+*.log
