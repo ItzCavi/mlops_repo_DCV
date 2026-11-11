@@ -48,6 +48,7 @@ riesgo.
 ├── readme.md
 ├── Dockerfile, .dockerignore          Imagen de la API
 ├── Jenkinsfile, docker-compose.yml    Pipeline de Jenkins y contenedor local de Jenkins
+├── .gitattributes                     Fin de línea de Windows para los .bat
 ├── sonar-project.properties           Configuración de SonarCloud
 └── .github/workflows/ci.yml           Integración continua en GitHub Actions
 ```
@@ -101,6 +102,7 @@ Todos los comandos se ejecutan desde la **raíz del repositorio** con el entorno
 | 6 | `python mlops_pipeline/model_monitoring.py --job` | Trabajo de monitoreo (tablas de drift) |
 | 7 | `streamlit run mlops_pipeline/model_monitoring.py` | Tablero de monitoreo |
 | 8 | `pytest mlops_pipeline -v` | Pruebas automáticas |
+| 9 | `ruff check mlops_pipeline --line-length 120 --select E,F,W,B,UP --exclude "*.ipynb"` | Revisión de estilo |
 
 ## 5. Hallazgos del análisis exploratorio
 
@@ -168,12 +170,28 @@ Documentación interactiva: http://localhost:8000/docs
 | Método | Ruta | Entrada |
 |---|---|---|
 | GET | `/health` | - |
-| POST | `/predict` | JSON `{"registros": [ {...}, {...} ]}` (lote de hasta 10.000 registros) |
-| POST | `/predict/csv` | Archivo CSV con las columnas de `Base_de_datos.csv` |
+| POST | `/predict` | Lote de registros en **JSON o CSV**, según el `Content-Type` (hasta 10.000 registros) |
+| POST | `/predict/csv` | Atajo para subir un archivo CSV desde `/docs` |
+
+`/predict` acepta tres formatos en el mismo endpoint:
 
 ```bash
-curl -X POST http://localhost:8000/predict/csv -F "archivo=@Base_de_datos.csv"
+# JSON
+curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" \
+     -d '{"registros": [{"tipo_credito": 4, "fecha_prestamo": "2025-01-07 14:40:36", ...}]}'
+
+# CSV en el cuerpo de la petición
+curl -X POST http://localhost:8000/predict -H "Content-Type: text/csv" --data-binary @Base_de_datos.csv
+
+# Archivo CSV (multipart)
+curl -X POST http://localhost:8000/predict -F "archivo=@Base_de_datos.csv"
 ```
+
+El CSV lleva las columnas de `Base_de_datos.csv` (`Pago_atiempo` es opcional y se ignora). La API
+valida el esquema (422 con el detalle si falta un campo o un tipo no coincide), limita el tamaño
+del archivo a 20 MB y responde 415 si el formato no es JSON ni CSV. El modelo guardado incluye
+la limpieza y los atributos derivados de `ft_engineering.py`, así que se le envían los registros
+crudos.
 
 Respuesta:
 
@@ -196,13 +214,19 @@ entrenamiento.
 
 ### Docker
 
+La imagen contiene el código fuente (`mlops_pipeline/`), las dependencias
+(`requirements-deploy.txt`: las de `requirements.txt` que usa la API, sin Jupyter, Streamlit ni
+herramientas de pruebas, para que la imagen sea más liviana), el servidor Uvicorn y la
+configuración (`Dockerfile`, `.dockerignore`, `config.json`).
+
 ```bash
 docker build -t riesgo-impago-api .
 docker run -p 8000:8000 riesgo-impago-api
 ```
 
-La imagen entrena el modelo durante la construcción, para que se serialice con las mismas
-versiones de Python y scikit-learn que lo cargan. La API queda en http://localhost:8000/docs.
+Durante la construcción se entrena el modelo, para que se serialice con las mismas versiones de
+Python y scikit-learn que lo cargan. Luego la API queda en http://localhost:8000/docs y la imagen
+tiene un `HEALTHCHECK` sobre `/health`. El contenedor corre con un usuario sin privilegios.
 
 ## 9. Monitoreo (`model_monitoring.py`)
 
@@ -257,14 +281,24 @@ vistos. En producción, la referencia sería exactamente el periodo de entrenami
 
 ## 10. Calidad e integración continua
 
-### Pruebas
+### Pruebas y estilo
 
 ```bash
 pytest mlops_pipeline -v --cov=mlops_pipeline --cov-report=xml --junitxml=resultados_pruebas.xml
+ruff check mlops_pipeline --line-length 120 --select E,F,W,B,UP --exclude "*.ipynb"
 ```
 
-21 pruebas: limpieza, atributos derivados, preprocesamiento, métricas de evaluación, PSI,
-Jensen-Shannon, tendencias, recomendaciones, análisis temporal y API (JSON, CSV y errores).
+37 pruebas con 94 % de cobertura de líneas:
+
+- **Estructura:** cada archivo obligatorio del proyecto existe en su ruta.
+- **Unitarias:** limpieza, atributos derivados, preprocesamiento, métricas de evaluación, PSI,
+  Jensen-Shannon, tendencias y recomendaciones.
+- **Integración:** entrenamiento completo (con modelos rápidos y en una carpeta temporal), trabajo
+  de monitoreo y gráficos, aplicación Streamlit (con `streamlit.testing`) y API (JSON, CSV en el
+  cuerpo, archivo CSV, misma predicción en ambos formatos y entradas inválidas).
+
+`ruff` revisa las convenciones de estilo (PEP 8) y errores comunes (variables sin usar,
+argumentos mutables, anotaciones obsoletas).
 
 ### GitHub Actions
 
@@ -272,6 +306,15 @@ Jensen-Shannon, tendencias, recomendaciones, análisis temporal y API (JSON, CSV
 y `master`: valida la estructura, instala dependencias, entrena, prueba con cobertura, ejecuta el
 trabajo de monitoreo, guarda los artefactos y, si existe el secreto `SONAR_TOKEN`, envía el
 análisis a SonarCloud.
+
+### SonarCloud: qué evalúa
+
+| Aspecto | Cómo se cubre |
+|---|---|
+| Calidad y mantenibilidad | Código duplicado, complejidad ciclomática y cognitiva, funciones largas y malas prácticas (*code smells*) en `mlops_pipeline/*.py`. |
+| Seguridad | Vulnerabilidades y *security hotspots*: exposición de datos sensibles, funciones o librerías inseguras. La API limita el tamaño de los archivos, no devuelve trazas internas y el contenedor no corre como root. |
+| Cobertura | Se publica `coverage.xml` (líneas ejecutadas) y `resultados_pruebas.xml` (pruebas ejecutadas). |
+| Integridad y estilo | Reglas de estilo de Python de SonarCloud, además de `ruff` en el pipeline. |
 
 ### SonarCloud
 
@@ -292,8 +335,18 @@ análisis a SonarCloud.
    luego `apt-get update` y `apt install -y docker.io`; verifique con `docker ps`.
 3. (Opcional, para SonarCloud) Manage Jenkins > Credentials: credencial *Secret text* con ID
    `sonarcloud-token` y el token de SonarCloud.
-4. New Item > Pipeline > Definition: *Pipeline script from SCM* > Git, URL de este repositorio,
-   rama `*/developer` (o `certification` / `master`) y Script Path `Jenkinsfile`.
-5. *Build Now*. Etapas: preparar Python, validar estructura, entorno virtual, entrenamiento,
-   pruebas, monitoreo de drift, SonarCloud e imagen Docker. Los artefactos (modelo, tablas y
-   cobertura) quedan archivados en cada build.
+4. New Item > **Multibranch Pipeline** > Branch Sources: Git con la URL de este repositorio y
+   Script Path `Jenkinsfile`. Jenkins descubre `developer`, `certification` y `master` y crea un
+   pipeline por rama. (Alternativa: un job *Pipeline* con *Pipeline script from SCM* y una rama.)
+5. *Scan Multibranch Pipeline Now* (o *Build Now*).
+
+**Pipeline (`Jenkinsfile`):** clonar repositorio, preparar Python, validar la estructura de
+carpetas, entorno virtual, estilo (`ruff`), entrenamiento, pruebas (con reporte JUnit), monitoreo
+de drift, SonarCloud e imagen Docker. La imagen solo se construye en `certification` y `master`.
+Los artefactos (modelo, tablas y cobertura) quedan archivados en cada build.
+
+**Trigger automático:** `pollSCM('H/5 * * * *')`. Jenkins revisa el repositorio cada 5 minutos y
+lanza el build de la rama que recibió commits nuevos, por ejemplo al hacer merge de `developer` a
+`certification` o de `certification` a `master`. Se usa sondeo porque un Jenkins local no es
+accesible desde GitHub para recibir webhooks; con un Jenkins público se puede reemplazar por el
+webhook de GitHub (`githubPush()`).

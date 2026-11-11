@@ -215,7 +215,7 @@ def definir_modelos() -> dict:
 def graficar_comparacion(resumen, curvas, mejor_nombre, mejor_modelo, X_test, y_test, ruta):
     """Panel con la comparación de los modelos y el diagnóstico del seleccionado."""
     modelos = list(resumen.index)
-    colores = dict(zip(modelos, plt.cm.tab10.colors))
+    colores = dict(zip(modelos, plt.cm.tab10.colors, strict=False))
     fig, axes = plt.subplots(2, 4, figsize=(24, 11))
 
     # 1. Métricas de validación cruzada con su desviación entre folds.
@@ -275,7 +275,7 @@ def graficar_comparacion(resumen, curvas, mejor_nombre, mejor_modelo, X_test, y_
     candidatos = resumen.drop(index=NOMBRE_BASE)
     acumulado = np.zeros(len(candidatos))
     for criterio, color in zip(["rendimiento", "consistencia", "escalabilidad"],
-                               ["steelblue", "mediumpurple", "seagreen"]):
+                               ["steelblue", "mediumpurple", "seagreen"], strict=True):
         valores = pesos[criterio] * candidatos[f"puntaje_{criterio}"].values
         ax.barh(candidatos.index, valores, left=acumulado, color=color,
                 label=f"{criterio} (peso {pesos[criterio]})")
