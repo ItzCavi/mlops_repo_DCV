@@ -2,7 +2,8 @@
 //
 // Etapas: clonar repositorio -> preparar Python -> validar estructura -> entorno virtual ->
 //         estilo (ruff) -> entrenamiento -> pruebas con cobertura -> monitoreo de drift ->
-//         SonarCloud -> imagen Docker de la API (solo en certification y master).
+//         SonarCloud -> imagen Docker de la API (solo en certification y master) ->
+//         notificación de fin (log, correo y/o webhook).
 //
 // Configuración recomendada del job: New Item > Multibranch Pipeline > Branch Sources: Git con la
 // URL del repositorio (descubre developer, certification y master) y Script Path: Jenkinsfile.
@@ -16,10 +17,47 @@
 // SonarCloud (opcional): crear en Manage Jenkins > Credentials una credencial "Secret text" con
 // ID "sonarcloud-token" y el token generado en sonarcloud.io. Si no existe, la etapa se omite y
 // el build queda como UNSTABLE (amarillo), sin fallar.
+//
+// Notificación al terminar (siempre se escribe en el log, y además por los canales configurados):
+//   - Correo: variable de entorno global NOTIFICAR_A con el destinatario
+//     (Manage Jenkins > System > Global properties > Environment variables) y el servidor SMTP
+//     configurado en Manage Jenkins > System > E-mail Notification.
+//   - Webhook (Discord, Slack o Teams): credencial "Secret text" con ID "webhook-notificaciones"
+//     y la URL del webhook.
 
 def ramaActual() {
     // BRANCH_NAME existe en Multibranch Pipeline; GIT_BRANCH ("origin/master") en un job simple.
     return (env.BRANCH_NAME ?: env.GIT_BRANCH ?: '').replaceFirst('^origin/', '')
+}
+
+def notificar(String resultado) {
+    def duracion = currentBuild.durationString.replace(' and counting', '')
+    def mensaje = "Jenkins | ${env.JOB_NAME} #${env.BUILD_NUMBER} | rama: ${ramaActual()} | " +
+                  "resultado: ${resultado} | duración: ${duracion} | ${env.BUILD_URL}"
+    echo "Notificación de fin del pipeline -> ${mensaje}"
+
+    if (env.NOTIFICAR_A) {
+        try {
+            mail to: env.NOTIFICAR_A,
+                 subject: "[${resultado}] ${env.JOB_NAME} #${env.BUILD_NUMBER} (${ramaActual()})",
+                 body: mensaje
+            echo "Correo enviado a ${env.NOTIFICAR_A}."
+        } catch (err) {
+            echo "No se pudo enviar el correo (revise la configuración SMTP): ${err.getMessage()}"
+        }
+    }
+
+    try {
+        withCredentials([string(credentialsId: 'webhook-notificaciones', variable: 'WEBHOOK_URL')]) {
+            // "content" lo usa Discord y "text" lo usan Slack y Teams.
+            def texto = mensaje.replace('\\', '\\\\').replace('"', '\\"')
+            writeFile file: 'notificacion.json', text: "{\"content\": \"${texto}\", \"text\": \"${texto}\"}"
+            sh 'curl -sS -f -X POST -H "Content-Type: application/json" --data @notificacion.json "$WEBHOOK_URL"'
+            echo 'Notificación enviada al webhook.'
+        }
+    } catch (err) {
+        echo "Sin notificación por webhook (credencial 'webhook-notificaciones' no configurada o URL no válida)."
+    }
 }
 
 def dockerDisponible() {
@@ -167,6 +205,8 @@ pipeline {
             archiveArtifacts allowEmptyArchive: true, fingerprint: true, artifacts:
                 'mlops_pipeline/mejor_modelo.joblib, mlops_pipeline/resumen_evaluacion.csv, ' +
                 'mlops_pipeline/comparacion_modelos.png, mlops_pipeline/monitoreo_*.csv, coverage.xml'
+            // Notificación cuando termina el proceso, sea cual sea el resultado.
+            notificar(currentBuild.currentResult)
         }
     }
 }

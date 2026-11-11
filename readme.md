@@ -338,12 +338,22 @@ análisis a SonarCloud.
 4. New Item > **Multibranch Pipeline** > Branch Sources: Git con la URL de este repositorio y
    Script Path `Jenkinsfile`. Jenkins descubre `developer`, `certification` y `master` y crea un
    pipeline por rama. (Alternativa: un job *Pipeline* con *Pipeline script from SCM* y una rama.)
-5. *Scan Multibranch Pipeline Now* (o *Build Now*).
+5. (Opcional) Notificaciones al terminar:
+   - **Correo:** en Manage Jenkins > System, configure *E-mail Notification* (para Gmail: servidor
+     `smtp.gmail.com`, puerto 465, SSL y una contraseña de aplicación) y agregue en *Global
+     properties > Environment variables* la variable `NOTIFICAR_A` con el correo de destino.
+   - **Discord, Slack o Teams:** cree un webhook en el canal y guárdelo en Manage Jenkins >
+     Credentials como *Secret text* con ID `webhook-notificaciones`.
+6. *Scan Multibranch Pipeline Now* (o *Build Now*).
 
 **Pipeline (`Jenkinsfile`):** clonar repositorio, preparar Python, validar la estructura de
 carpetas, entorno virtual, estilo (`ruff`), entrenamiento, pruebas (con reporte JUnit), monitoreo
 de drift, SonarCloud e imagen Docker. La imagen solo se construye en `certification` y `master`.
 Los artefactos (modelo, tablas y cobertura) quedan archivados en cada build.
+
+**Notificación al terminar:** en el bloque `post { always { ... } }` el pipeline envía un resumen
+(job, número de build, rama, resultado, duración y enlace) al log, y por correo y/o webhook si
+están configurados. Se envía tanto si el build termina bien como si falla.
 
 **Trigger automático:** `pollSCM('H/5 * * * *')`. Jenkins revisa el repositorio cada 5 minutos y
 lanza el build de la rama que recibió commits nuevos, por ejemplo al hacer merge de `developer` a
